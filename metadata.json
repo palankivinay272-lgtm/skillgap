@@ -1,0 +1,5 @@
+{
+  "name": "Skill Gap Heatmap Platform",
+  "description": "An analytics dashboard platform for colleges to identify mismatches between student skills and industry requirements using heatmaps and gap analysis.",
+  "requestFramePermissions": []
+}

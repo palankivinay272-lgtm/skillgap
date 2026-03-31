@@ -1,0 +1,106 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "A user of the platform (student or admin)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Full name of the user" },
+        "email": { "type": "string", "format": "email", "description": "Email address" },
+        "role": { "type": "string", "enum": ["student", "admin"], "description": "User role" },
+        "targetRoleId": { "type": "string", "description": "ID of the target job role (for students)" },
+        "batch": { "type": "string", "description": "Graduation batch/year (for students)" }
+      },
+      "required": ["name", "email", "role"]
+    },
+    "Skill": {
+      "title": "Skill",
+      "description": "A technical or soft skill",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the skill" },
+        "category": { "type": "string", "description": "Category (e.g., Frontend, Backend)" }
+      },
+      "required": ["name", "category"]
+    },
+    "JobRole": {
+      "title": "Job Role",
+      "description": "A professional job role",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "Title of the job role" },
+        "description": { "type": "string", "description": "Description of the role" }
+      },
+      "required": ["title"]
+    },
+    "LearningResource": {
+      "title": "Learning Resource",
+      "description": "A resource to learn a specific skill",
+      "type": "object",
+      "properties": {
+        "skillId": { "type": "string", "description": "ID of the associated skill" },
+        "title": { "type": "string", "description": "Title of the resource" },
+        "url": { "type": "string", "format": "uri", "description": "URL to the resource" },
+        "type": { "type": "string", "enum": ["video", "course", "article"], "description": "Type of resource" }
+      },
+      "required": ["skillId", "title", "url", "type"]
+    },
+    "StudentSkill": {
+      "title": "Student Skill",
+      "description": "A student's proficiency in a skill",
+      "type": "object",
+      "properties": {
+        "proficiency": { "type": "integer", "description": "Proficiency level (1-5)" }
+      },
+      "required": ["proficiency"]
+    },
+    "IndustryRequirement": {
+      "title": "Industry Requirement",
+      "description": "Required proficiency for a skill in a job role",
+      "type": "object",
+      "properties": {
+        "requiredProficiency": { "type": "integer", "description": "Required proficiency level (1-5)" }
+      },
+      "required": ["requiredProficiency"]
+    },
+    "CompletedResource": {
+      "title": "Completed Resource",
+      "description": "A resource completed by a student",
+      "type": "object",
+      "properties": {
+        "completedAt": { "type": "string", "format": "date-time", "description": "Timestamp of completion" }
+      },
+      "required": ["completedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/users/{userId}/skills/{skillId}": {
+      "schema": "StudentSkill",
+      "description": "Student skill proficiencies"
+    },
+    "/users/{userId}/completed_resources/{resourceId}": {
+      "schema": "CompletedResource",
+      "description": "Resources completed by students"
+    },
+    "/skills/{skillId}": {
+      "schema": "Skill",
+      "description": "Master list of skills"
+    },
+    "/skills/{skillId}/resources/{resourceId}": {
+      "schema": "LearningResource",
+      "description": "Learning resources for skills"
+    },
+    "/job_roles/{roleId}": {
+      "schema": "JobRole",
+      "description": "Master list of job roles"
+    },
+    "/job_roles/{roleId}/requirements/{skillId}": {
+      "schema": "IndustryRequirement",
+      "description": "Skill requirements for job roles"
+    }
+  }
+}

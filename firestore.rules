@@ -1,0 +1,181 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: /users/{userId}
+    // Fields:
+    //   - name: string (required)
+    //   - email: string (required, email format)
+    //   - role: string (required, 'student' or 'admin')
+    //   - targetRoleId: string (optional)
+    //   - batch: string (optional)
+    //
+    // Collection: /users/{userId}/skills/{skillId}
+    // Fields:
+    //   - proficiency: number (required, 1-5)
+    //
+    // Collection: /users/{userId}/completed_resources/{resourceId}
+    // Fields:
+    //   - completedAt: timestamp (required)
+    //
+    // Collection: /skills/{skillId}
+    // Fields:
+    //   - name: string (required)
+    //   - category: string (required)
+    //
+    // Collection: /skills/{skillId}/resources/{resourceId}
+    // Fields:
+    //   - skillId: string (required)
+    //   - title: string (required)
+    //   - url: string (required, URL format)
+    //   - type: string (required, 'video', 'course', 'article')
+    //
+    // Collection: /job_roles/{roleId}
+    // Fields:
+    //   - title: string (required)
+    //   - description: string (optional)
+    //
+    // Collection: /job_roles/{roleId}/requirements/{skillId}
+    // Fields:
+    //   - requiredProficiency: number (required, 1-5)
+    //
+    // ===============================================================
+
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          request.auth.token.email == "23eg105a45@anurag.edu.in");
+    }
+
+    function isValidEmail(email) {
+      return email is string &&
+        email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function isValidUrl(url) {
+      return url is string &&
+        (url.matches("^https://.*") || url.matches("^http://.*"));
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    function hasRequiredFields(fields) {
+      return request.resource.data.keys().hasAll(fields);
+    }
+
+    // ===============================================================
+    // Domain Validators
+    // ===============================================================
+
+    function isValidUser(data) {
+      return hasRequiredFields(['name', 'email', 'role']) &&
+        hasOnlyAllowedFields(['name', 'email', 'role', 'targetRoleId', 'batch', 'createdAt']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+        isValidEmail(data.email) &&
+        data.role in ['student', 'admin'] &&
+        (!('targetRoleId' in data) || data.targetRoleId is string) &&
+        (!('batch' in data) || data.batch is string || data.batch == null) &&
+        (!('createdAt' in data) || data.createdAt is string);
+    }
+
+    function isValidStudentSkill(data) {
+      return hasRequiredFields(['proficiency']) &&
+        hasOnlyAllowedFields(['proficiency']) &&
+        data.proficiency is number && data.proficiency >= 1 && data.proficiency <= 5;
+    }
+
+    function isValidCompletedResource(data) {
+      return hasRequiredFields(['completedAt']) &&
+        hasOnlyAllowedFields(['completedAt']) &&
+        data.completedAt is timestamp;
+    }
+
+    function isValidSkill(data) {
+      return hasRequiredFields(['name', 'category']) &&
+        hasOnlyAllowedFields(['name', 'category']) &&
+        data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+        data.category is string && data.category.size() > 0 && data.category.size() < 50;
+    }
+
+    function isValidLearningResource(data) {
+      return hasRequiredFields(['skillId', 'title', 'url', 'type']) &&
+        hasOnlyAllowedFields(['skillId', 'title', 'url', 'type']) &&
+        data.skillId is string &&
+        data.title is string && data.title.size() > 0 && data.title.size() < 200 &&
+        isValidUrl(data.url) &&
+        data.type in ['video', 'course', 'article'];
+    }
+
+    function isValidJobRole(data) {
+      return hasRequiredFields(['title']) &&
+        hasOnlyAllowedFields(['title', 'description']) &&
+        data.title is string && data.title.size() > 0 && data.title.size() < 100 &&
+        (!('description' in data) || (data.description is string && data.description.size() < 1000));
+    }
+
+    function isValidIndustryRequirement(data) {
+      return hasRequiredFields(['requiredProficiency']) &&
+        hasOnlyAllowedFields(['requiredProficiency']) &&
+        data.requiredProficiency is number && data.requiredProficiency >= 1 && data.requiredProficiency <= 5;
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && 
+        ((isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin());
+      
+      match /skills/{skillId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin() && isValidStudentSkill(request.resource.data);
+      }
+
+      match /completed_resources/{resourceId} {
+        allow read: if isOwner(userId) || isAdmin();
+        allow write: if isOwner(userId) || isAdmin() && isValidCompletedResource(request.resource.data);
+      }
+    }
+
+    match /skills/{skillId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidSkill(request.resource.data);
+
+      match /resources/{resourceId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin() && isValidLearningResource(request.resource.data);
+      }
+    }
+
+    match /job_roles/{roleId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidJobRole(request.resource.data);
+
+      match /requirements/{skillId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin() && isValidIndustryRequirement(request.resource.data);
+      }
+    }
+  }
+}
